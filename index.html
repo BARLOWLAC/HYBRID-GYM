@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hybrid Gym Program</title>
+<meta name="theme-color" content="#0D1014">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hybrid Gym">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Base: safe areas for the iPhone notch and home bar, no page margin. */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); -webkit-text-size-adjust: 100%; }
+body { margin: 0; overscroll-behavior-y: none; }
+</style>
+<style>
+/* Layout: a single-column training card stack. Sticky day rail on top, sessions as tappable rows,
+   rest timer docked to the bottom like a stopwatch. Dark-first (gym floor), light variant mirrored. */
+:root {
+  --bg: #0D1014;
+  --surface: #151A21;
+  --surface-2: #1C232C;
+  --line: #262F3A;
+  --fg: #E8EDF3;
+  --muted: #8592A3;
+  --accent: #5B8CFF;
+  --accent-ink: #0A1430;
+  --done: #3ED598;
+  --done-soft: rgba(62, 213, 152, .14);
+  --accent-soft: rgba(91, 140, 255, .14);
+  --display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  --r: 14px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #F2F4F7; --surface: #FFFFFF; --surface-2: #EBEFF5; --line: #DCE2EA;
+    --fg: #121821; --muted: #5E6B7C; --accent: #2F5FE0; --accent-ink: #FFFFFF;
+    --done: #12A26A; --done-soft: rgba(18, 162, 106, .12); --accent-soft: rgba(47, 95, 224, .10);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #F2F4F7; --surface: #FFFFFF; --surface-2: #EBEFF5; --line: #DCE2EA;
+  --fg: #121821; --muted: #5E6B7C; --accent: #2F5FE0; --accent-ink: #FFFFFF;
+  --done: #12A26A; --done-soft: rgba(18, 162, 106, .12); --accent-soft: rgba(47, 95, 224, .10);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { background: var(--bg); }
+body {
+  color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.4;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 140px;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 560px; margin: 0 auto; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+
+/* Header */
+header.top { padding-block: 18px 6px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.brand .eyebrow { font-family: var(--display); font-weight: 600; letter-spacing: .14em; text-transform: uppercase; font-size: 12px; color: var(--muted); }
+.brand h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(26px, 8vw, 34px); line-height: 1; letter-spacing: .01em; text-transform: uppercase; }
+.brand h1 span { color: var(--accent); }
+.today { font-family: var(--display); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-align: right; }
+.today b { display: block; color: var(--fg); font-size: 15px; font-weight: 700; }
+
+/* Day rail */
+nav.days {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; padding-block: 10px;
+}
+nav.days::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 14px; background: linear-gradient(var(--bg), transparent); pointer-events: none; }
+.day {
+  border-radius: 12px; padding: 8px 0 7px; background: var(--surface); border: 1px solid var(--line);
+  display: flex; flex-direction: column; align-items: center; gap: 2px; position: relative;
+}
+.day .d { font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: .06em; text-transform: uppercase; }
+.day .s { font-size: 10.5px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.day[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.day[aria-selected="true"] .s { color: var(--accent-ink); opacity: .8; }
+.day .pip { position: absolute; top: 5px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--done); }
+.eta { grid-column: 1 / -1; margin-top: 4px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.eta .el { font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.eta .ev { font-family: var(--display); font-weight: 800; font-size: 22px; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.eta .ev small { font-size: 13px; font-weight: 700; color: var(--muted); margin-left: 2px; letter-spacing: .06em; }
+.eta .er { text-align: right; }
+.eta .er .ev { color: var(--accent); }
+.eta.fin .er .ev { color: var(--done); }
+.day.is-today:not([aria-selected="true"])::after { content: ""; position: absolute; bottom: -4px; width: 16px; height: 2px; border-radius: 2px; background: var(--accent); }
+
+/* Session hero */
+.hero { margin-top: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px 18px 16px; display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
+.hero .kicker { font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.hero h2 { margin: 2px 0 4px; font-family: var(--display); font-weight: 800; font-size: 30px; line-height: 1; text-transform: uppercase; text-wrap: balance; }
+.hero .meta { color: var(--muted); font-size: 13.5px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.tag { display: inline-block; font-family: var(--display); font-weight: 700; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); }
+.ring { width: 74px; height: 74px; position: relative; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .track { fill: none; stroke: var(--surface-2); stroke-width: 7; }
+.ring .bar { fill: none; stroke: var(--done); stroke-width: 7; stroke-linecap: round; transition: stroke-dashoffset .35s ease; }
+.ring .lbl { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; font-family: var(--display); font-weight: 700; font-size: 19px; line-height: 1; font-variant-numeric: tabular-nums; }
+.ring .lbl small { display: block; font-size: 10px; letter-spacing: .1em; color: var(--muted); font-weight: 600; margin-top: 2px; }
+
+/* Warm-up */
+details.warm { margin-top: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+details.warm summary { list-style: none; cursor: pointer; padding: 13px 16px; display: flex; justify-content: space-between; align-items: center; font-family: var(--display); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 14px; }
+details.warm summary::-webkit-details-marker { display: none; }
+details.warm summary .chev { transition: transform .2s; color: var(--muted); }
+details.warm[open] summary .chev { transform: rotate(180deg); }
+.warm ul { margin: 0; padding: 0 16px 14px; list-style: none; display: grid; gap: 7px; }
+.warm li { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; border-top: 1px solid var(--line); padding-top: 7px; }
+.warm li span:last-child { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Exercise list */
+.list { margin-top: 10px; display: grid; gap: 10px; }
+.group { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.group.ss .glabel { font-family: var(--display); font-weight: 700; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); padding: 10px 16px 0; }
+.ex { padding: 13px 16px 14px; display: grid; grid-template-columns: 30px 1fr; gap: 0 10px; }
+.ex + .ex { border-top: 1px dashed var(--line); }
+.ex .num { font-family: var(--display); font-weight: 700; font-size: 15px; color: var(--muted); padding-top: 2px; font-variant-numeric: tabular-nums; }
+.ex h3 { margin: 0; font-family: var(--body); font-weight: 600; font-size: 16px; line-height: 1.25; }
+.ex .rx { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.ex .rx .sets { font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.ex .rx .note { color: var(--muted); font-size: 13.5px; }
+.dots { grid-column: 2; display: flex; gap: 8px; margin-top: 11px; flex-wrap: wrap; }
+.dot {
+  min-width: 56px; height: 40px; border-radius: 11px; border: 1.5px solid var(--line); background: var(--surface-2);
+  font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: .06em; color: var(--muted);
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; transition: background .15s, border-color .15s, transform .1s;
+}
+.dot:active { transform: scale(.95); }
+.dot[aria-pressed="true"] { background: var(--done-soft); border-color: var(--done); color: var(--done); }
+.dot svg { width: 14px; height: 14px; }
+.ex.complete h3 { color: var(--muted); }
+.ex.complete .num { color: var(--done); }
+
+.foot { margin-top: 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: 12.5px; }
+.reset { font-family: var(--display); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; font-size: 13px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); }
+.reset.arm { border-color: #E5484D; color: #E5484D; }
+
+/* Done banner */
+.finish { margin-top: 12px; border-radius: var(--r); padding: 14px 16px; background: var(--done-soft); border: 1px solid var(--done); color: var(--done); font-family: var(--display); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: 16px; text-align: center; }
+
+/* Rest timer dock */
+.timer {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  transform: translateY(110%); transition: transform .28s cubic-bezier(.2,.8,.2,1);
+}
+.timer.show { transform: none; }
+.tcard { max-width: 560px; margin: 0 auto; background: var(--fg); color: var(--bg); border-radius: 18px; padding: 12px 12px 12px 18px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; box-shadow: 0 12px 34px rgba(0,0,0,.35); position: relative; overflow: hidden; }
+.tcard .fill { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--accent); width: 100%; transform-origin: left; }
+.tcard .tl { font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; opacity: .65; }
+.tcard .tt { font-family: var(--display); font-weight: 800; font-size: 38px; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.tcard .tn { font-size: 12.5px; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tbtns { display: flex; gap: 6px; }
+.tbtns button { height: 44px; min-width: 48px; padding: 0 10px; border-radius: 12px; background: rgba(127,127,127,.18); font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: .04em; color: var(--bg); }
+.tbtns button.go { background: var(--accent); color: var(--accent-ink); }
+.timer.done .tcard { background: var(--done); color: #06140E; }
+.timer.done .tbtns button { color: #06140E; }
+
+.empty { margin-top: 10px; padding: 22px 18px; border-radius: 18px; border: 1px dashed var(--line); color: var(--muted); text-align: center; }
+.empty b { display: block; color: var(--fg); font-family: var(--display); font-size: 22px; text-transform: uppercase; letter-spacing: .04em; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* v1.1: Sunday mobility, hold timers, coaching cards, finisher top-ups */
+nav.days { grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.day { min-width: 0; overflow: hidden; }
+.day .d { font-size: 14px; letter-spacing: .03em; }
+.day .s { font-size: 8.5px; letter-spacing: 0; white-space: nowrap; }
+.dot { text-transform: uppercase; }
+.sec { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 4px 0; font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.sec span:first-child { color: var(--fg); }
+.dot { padding: 0 10px; }
+.dot .pl { width: 9px; height: 9px; }
+.dot.live { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 4px var(--accent-soft); } }
+
+details.how { grid-column: 2; margin-top: 10px; }
+details.how summary { list-style: none; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); padding: 4px 0; }
+details.how summary::-webkit-details-marker { display: none; }
+details.how .chev, details.topup > summary .chev { transition: transform .2s; }
+details.how[open] > summary .chev, details.topup[open] > summary .chev { transform: rotate(180deg); }
+.howb { margin-top: 8px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); }
+.howb dl { margin: 0; display: grid; grid-template-columns: 84px 1fr; gap: 9px 12px; font-size: 13.5px; line-height: 1.45; }
+.howb dt { font-family: var(--display); font-weight: 700; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
+.howb dd { margin: 0; }
+.howb ul { margin: 0; padding-left: 16px; display: grid; gap: 3px; }
+.demo { margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); text-decoration: none; font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+.demo svg { width: 12px; height: 12px; }
+@media (max-width: 380px) { .howb dl { grid-template-columns: 1fr; gap: 2px; } .howb dd { margin-bottom: 8px; } }
+
+.modebar { margin-top: 10px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; gap: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.seg button { height: 38px; border-radius: 9px; font-family: var(--display); font-weight: 700; font-size: 13.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.modebar p { margin: 8px 4px 0; color: var(--muted); font-size: 13px; }
+
+details.topup { margin-top: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+details.topup > summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+details.topup > summary::-webkit-details-marker { display: none; }
+.fk { font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.ft { font-family: var(--display); font-weight: 800; font-size: 20px; text-transform: uppercase; line-height: 1.05; margin-top: 2px; }
+.tr { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 700; letter-spacing: .06em; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.tr .tc { padding: 3px 8px; border-radius: 7px; background: var(--surface-2); color: var(--fg); }
+details.topup.fin .tc { background: var(--done-soft); color: var(--done); }
+.tbody { border-top: 1px solid var(--line); }
+
+.warm.re li { display: block; }
+.warm.re li b { display: block; font-weight: 600; }
+.warm.re li span { color: var(--muted); text-align: left; }
+
+.timer.hold .fill { background: var(--done); }
+.tcard > div:first-child { min-width: 0; }
+.timer.switch .tcard { background: var(--accent); color: var(--accent-ink); }
+.timer.switch .tbtns button { color: var(--accent-ink); }
+@media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } }
+
+@media (max-width: 360px) { .dot { min-width: 48px; } .brand h1 { font-size: 30px; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="eyebrow">Lachie Barlow · v1.2</div>
+      <h1>Hybrid <span>Gym</span> Program</h1>
+    </div>
+    <div class="today" id="today"></div>
+  </header>
+
+  <nav class="days" role="tablist" aria-label="Sessions" id="days"></nav>
+  <main id="main"></main>
+</div>
+
+<div class="timer" id="timer" aria-live="polite">
+  <div class="tcard">
+    <div>
+      <div class="tl" id="tLabel">Rest</div>
+      <div class="tt" id="tTime">0:00</div>
+      <div class="tn" id="tNext"></div>
+    </div>
+    <div class="tbtns">
+      <button id="tMinus" aria-label="Remove 15 seconds">-15</button>
+      <button id="tPlus" aria-label="Add 15 seconds">+15</button>
+      <button id="tSkip" class="go" aria-label="Skip rest">Skip</button>
+    </div>
+    <div class="fill" id="tFill"></div>
+  </div>
+</div>
+
+<script>
+// Always dark (gym floor), regardless of the phone's light/dark setting.
+document.documentElement.setAttribute("data-theme", "dark");
+// Rest defaults (seconds): big compound lifts, isolation, plyos, core, mobility drills, stretch transitions. 0 = superset "a" leg.
+const BIG = 150, ISO = 75, PLY = 45, CORE = 60, MOB = 20, TRANS = 10, SWITCH = 5;
+const UPPER_WARM = [
+  ["Rower or bike, easy", "2-3 min"], ["Band pull-aparts", "2 x 15"], ["Band dislocates", "1 x 10"],
+  ["Band external rotations", "1 x 12/arm"], ["Scap push-ups", "1 x 10"], ["Dead hang", "20-30 s"],
+  ["Ramp sets, bench example", "20 x10, 60 x5, 80 x3, 90 x1"]
+];
+const LOWER_WARM = [
+  ["Hamstring foam roll", "1-2 min"], ["Single-leg glute bridge", "2 x 10/leg"], ["Banded crab walks", "2 x 10 each way"],
+  ["Multi-directional hops", "1 x 20"], ["Calf and tib stretch", "1 min"]
+];
+
+// Coaching cards. s = setup, c = cues, f = should feel, a = avoid, e = easier version, q = demo search.
+const HOW = {
+  roll: { s: "Roller under the target area, hands or forearms taking some of your weight.",
+    c: ["Slow passes, pause on tender spots and breathe", "T-spine: hands behind head, roll mid to upper back only", "Lats: lie on your side, bottom arm overhead, roller just below the armpit"],
+    f: "Firm pressure and tolerable discomfort, never sharp pain.", a: "Rolling the lower back or directly over the side of the knee.",
+    e: "Take more weight through your hands, or use a softer roller.", q: "foam rolling calves quads thoracic spine lats" },
+  ankle: { s: "Half-kneeling facing a wall, front foot a short distance from it.",
+    c: ["Drive the knee forward over the middle toes towards the wall", "Keep the front heel down the whole time", "Slide the foot back as touching the wall gets easy"],
+    f: "Stretch in the calf or the front of the ankle working through range.", a: "Heel lifting or the knee caving inwards. A sharp pinch at the front of the ankle means reduce the range.",
+    e: "Hold the wall for balance and use a smaller range.", q: "knee to wall ankle mobility drill" },
+  hip9090: { s: "Sit on the floor with both knees bent to 90 degrees: front leg turned out, back leg turned in, feet planted wider than hips.",
+    c: ["Sit tall with hands behind you if needed", "Rotate both knees to the other side together, feet stay planted", "Move slowly and control the whole range"],
+    f: "Hips rotating; stretch in the outer hip of the front leg.", a: "Rounding the lower back or forcing the knees to the floor.",
+    e: "Lean back on your hands and only go as far as is comfortable.", q: "90 90 hip switches" },
+  cossack: { s: "Wide stance, toes slightly out, light kettlebell held at your chest as a counterweight.",
+    c: ["Shift into one hip and sit down, other leg straight with toes pointing up", "Keep the working heel flat", "Push back through the middle, then switch sides"],
+    f: "Inner thigh of the straight leg; hip and ankle of the bent leg.", a: "Working heel lifting or the chest collapsing forward.",
+    e: "Hold a rack or TRX with both hands and only go partway down.", q: "cossack squat kettlebell counterweight" },
+  openbook: { s: "Lie on your side, knees bent to 90 degrees and stacked, arms straight out in front with hands together.",
+    c: ["Keep the knees stacked and on the floor", "Open the top arm across and rotate your upper back, eyes follow the hand", "Breathe out as you open, pause, return"],
+    f: "Rotation through the mid and upper back, stretch across the chest.", a: "Knees lifting, or forcing the arm to the floor through the shoulder.",
+    e: "Put a foam roller or pillow under the top knee to keep it pinned.", q: "open book thoracic rotation" },
+  wallslide: { s: "Back, head and forearms against the wall, elbows at shoulder height.",
+    c: ["Ribs down so the lower back stays flat to the wall", "Slide the arms up only as high as you can keep contact", "At the top, lift the hands slightly off the wall, pause, return"],
+    f: "Upper back and the back of the shoulders working.", a: "Arching the lower back to fake extra height.",
+    e: "Stand a small step away from the wall and skip the lift-off.", q: "wall slides with lift off" },
+  goblet: { s: "Light kettlebell or dumbbell at your chest, feet about shoulder-width, toes slightly out.",
+    c: ["Sit down between your heels", "Use the elbows to gently press the knees out", "Chest up, breathe slowly, shift gently side to side"],
+    f: "Hips, groin and ankles opening up.", a: "Heels lifting or rounding hard at the bottom.",
+    e: "Small plate under the heels, or hold a rack for support.", q: "deep goblet squat hold mobility" },
+  couch: { s: "Back knee on a pad against a bench or wall, shin running up it. Front foot planted in a half-kneel.",
+    c: ["Tuck the pelvis under by squeezing the glute of the back leg", "Bring the torso upright only as far as you can keep that tuck", "Ease deeper on each breath out"],
+    f: "Front of the back thigh and hip.", a: "Arching the lower back, or pressure pain at the kneecap (add padding or move the knee).",
+    e: "Move the knee further from the wall and keep hands on the front knee or a box.", q: "couch stretch hip flexor" },
+  hamstring: { s: "Heel on a box or bench between knee and hip height, standing leg straight, both feet pointing forward.",
+    c: ["Hinge forward from the hips with a flat back", "Raised knee straight but not locked", "Hands on hips or the thigh, not reaching for toes"],
+    f: "Back of the raised thigh.", a: "Rounding the back to reach further.",
+    e: "Lower box or a slight bend in the raised knee.", q: "elevated hamstring stretch flat back" },
+  calfS: { s: "Hands on the wall, back leg straight with the heel down and toes pointing forward.",
+    c: ["Lean the hips towards the wall", "Keep the back heel planted and the knee straight"],
+    f: "Upper calf of the back leg.", a: "Back foot turning out or the heel lifting.",
+    e: "Shorter stance.", q: "straight knee wall calf stretch gastrocnemius" },
+  calfB: { s: "Same wall stance, with the back foot stepped a little closer.",
+    c: ["Bend the back knee while keeping the heel down", "Sink the hips straight down"],
+    f: "Lower calf, towards the Achilles.", a: "Heel lifting off the floor.",
+    e: "Shorter stance and less knee bend.", q: "bent knee wall calf stretch soleus" },
+  pec: { s: "Forearm on a doorframe or cable column, elbow at about shoulder height.",
+    c: ["Step through and turn the body gently away", "Keep the shoulder blade back and down", "Adjust the elbow height to shift where you feel it"],
+    f: "Across the chest and front of the shoulder.", a: "Shoulder rolling forward, or tingling into the arm (back off).",
+    e: "Smaller step through.", q: "doorway pec stretch" },
+  bridge: { s: "Lie on your back, one foot flat near your glutes, the other leg straight in the air or hugged to your chest.",
+    c: ["Drive through the heel and lift until knee, hip and shoulder line up", "Pause briefly at the top, lower slowly", "Keep the hips level, no twisting"],
+    f: "Glute of the working leg.", a: "Arching the lower back, or feeling it mainly in the hamstring (bring the foot closer).",
+    e: "Both feet down (double-leg bridge).", q: "single leg glute bridge" },
+  wallsit: { s: "Back flat against a wall or tree, feet forward, slide down until the knees bend to about 90 degrees or a bit shallower.",
+    c: ["Knees track over the middle toes", "Weight through the whole foot", "Breathe steadily and hold still"],
+    f: "Quads working hard, no pain at the front of the knee.", a: "Knees caving in, or pain at the kneecap (go shallower).",
+    e: "Shallower knee angle.", q: "wall sit form" },
+  hiphike: { s: "Stand side-on at the edge of a step or kerb on one leg, the other foot hanging off the edge.",
+    c: ["Standing knee straight but not locked", "Let the free hip drop, then lift it above level using the standing-side hip", "Slow, with a brief hold at the top"],
+    f: "Side of the hip on the standing leg.", a: "Leaning the torso sideways to fake the movement.",
+    e: "Hand on a wall or post for balance.", q: "hip hikes pelvic drop exercise" },
+  swingFB: { s: "Stand side-on to a wall, post or tree, one hand on it for balance.",
+    c: ["Swing the outside leg forward and back like a pendulum", "Start small and build the range", "Stay tall, move from the hip"],
+    f: "Hamstrings at the front of the swing, hip flexors at the back.", a: "Forcing the range early or rounding the back.",
+    e: "Smaller swings.", q: "front to back leg swings runners" },
+  swingSS: { s: "Face the wall, post or tree with both hands on it.",
+    c: ["Swing one leg across the body and out to the side", "Keep the hips facing forward", "Build the range gradually"],
+    f: "Inner and outer thigh and hip.", a: "Twisting the hips to swing further.",
+    e: "Smaller swings.", q: "lateral leg swings" },
+  lunge: { s: "Stand tall, feet hip-width apart.",
+    c: ["Step one foot back into a reverse lunge", "Reach both arms overhead and lean slightly away from the back leg", "Drive back up through the front foot and switch sides"],
+    f: "Front of the back hip and a stretch along the side.", a: "Front knee caving in, or arching the back hard.",
+    e: "Shorter step, hands on hips.", q: "reverse lunge overhead reach" },
+  pogo: { s: "Stand tall, feet hip-width apart, arms relaxed.",
+    c: ["Bounce off the balls of the feet with quick, stiff ankles", "Minimal knee bend", "Light and quiet landings"],
+    f: "Calves and Achilles springing.", a: "Big knee bend or heavy landings.",
+    e: "Smaller, slower hops.", q: "pogo hops runners" },
+  askip: { s: "A flat stretch of path or grass about 20 m long.",
+    c: ["Drive one knee up to hip height while the other foot does a small skip", "Land under the hips on the ball of the foot", "Opposite arm drives with each knee"],
+    f: "Hip flexors and calves working in rhythm.", a: "Leaning back, or reaching the foot out in front.",
+    e: "A-march (the walking version).", q: "A skip running drill" },
+  highknees: { s: "The same 20 m stretch.",
+    c: ["Quick, short steps lifting the knees towards hip height", "Stay tall and land under the hips", "Fast arms"],
+    f: "Quick turnover, hip flexors working.", a: "Leaning back.",
+    e: "Slower cadence.", q: "high knees running drill" },
+  quad: { s: "Stand tall, a hand on a wall or post if needed, and hold one ankle behind you.",
+    c: ["Knees together", "Tuck the pelvis slightly to feel it at the front of the hip", "Stay tall, don't lean forward"],
+    f: "Front of the thigh.", a: "Knee drifting out or the back arching.",
+    e: "Hold the shoe or sock if you can't reach the ankle.", q: "standing quad stretch" },
+  hipflexor: { s: "Half-kneel with the back knee on grass or a folded jacket, front foot flat.",
+    c: ["Squeeze the glute of the back leg and tuck the pelvis", "Shift forward slightly while staying tall", "Raise the same-side arm overhead to deepen it"],
+    f: "Front of the back hip.", a: "Arching the lower back.",
+    e: "Smaller shift forward.", q: "half kneeling hip flexor stretch" },
+  lat: { s: "Kneel facing a bench, elbows on it, palms together or holding a light stick.",
+    c: ["Sit the hips back towards the heels", "Let the chest sink towards the floor", "Ribs down, breathe into the upper back"],
+    f: "Lats, armpits and upper back.", a: "Sagging into the lower back.",
+    e: "Sit back less.", q: "bench lat stretch kneeling" }
+};
+
+const topups = straight => [
+  { n: "T1", name: "Couch stretch", rx: "1 x 60 s/side", note: "Hip flexors, quads", sets: 1, hold: 60, sides: 2, rest: TRANS, how: HOW.couch },
+  { n: "T2", name: straight ? "Wall calf stretch, straight knee" : "Wall calf stretch, bent knee", rx: "1 x 60 s/side",
+    note: straight ? "Upper calf. Bent knee on Wed" : "Lower calf. Straight knee Mon and Fri", sets: 1, hold: 60, sides: 2, rest: TRANS, how: straight ? HOW.calfS : HOW.calfB },
+  { n: "T3", name: "Doorway or cable pec stretch", rx: "1 x 60 s/side", note: "Pecs", sets: 1, hold: 60, sides: 2, rest: 0, how: HOW.pec }
+];
+
+const SESSIONS = {
+  mon: { day: "Mon", short: "Upper A", title: "Upper A", focus: "Strength + chest", mins: "65-70", run: "Lunch: quality run", warm: UPPER_WARM, finisher: topups(true), groups: [
+    [{ n: "1", name: "Barbell bench press", rx: "3 x 5-8", note: "RIR 1-2", sets: 3, rest: BIG }],
+    [{ n: "2", name: "Weighted pull-ups", rx: "3 x 5-8", note: "RIR 1-2", sets: 3, rest: BIG }],
+    [{ n: "3", name: "DB shoulder press", rx: "3 x 5-8", note: "RIR 2", sets: 3, rest: BIG }],
+    [{ n: "4", name: "Seated chest-supported row", rx: "3 x 5-8", note: "Neutral grip, heavy. RIR 1-2", sets: 3, rest: BIG }],
+    [{ n: "5", name: "Weighted dips", rx: "3 x 5-8", note: "RIR 2, never to failure", sets: 3, rest: BIG }],
+    [{ n: "6", name: "Low-to-high cable fly", rx: "3 x 8-12", note: "Upper chest. RIR 0-1", sets: 3, rest: ISO }],
+    [{ n: "7a", name: "Cable lateral raise", rx: "3 x 8-12", note: "RIR 0-1", sets: 3, rest: 0 },
+     { n: "7b", name: "Cable rear delt fly", rx: "3 x 8-12", note: "RIR 0-1", sets: 3, rest: ISO }]
+  ]},
+  tue: { day: "Tue", short: "Lower A", title: "Lower A", focus: "Functional strength", mins: "55-60", run: "Lunch: easy, optional", warm: LOWER_WARM, groups: [
+    [{ n: "1", name: "Hex bar deadlift", rx: "3 x 5-8", note: "RIR 2", sets: 3, rest: BIG }],
+    [{ n: "2", name: "DB Bulgarian split squat", rx: "3 x 5-8/leg", note: "3 s down. Weaker leg first", sets: 3, rest: BIG }],
+    [{ n: "3", name: "Nordic curl, band-assisted", rx: "Wk 1-2: 2 x 3-5", note: "Then build to 3 x 5-8. Slow lowering", sets: 3, rest: BIG }],
+    [{ n: "4", name: "Seated calf raise machine", rx: "3 x 8-12", note: "Heavy. 1-2 s pause in the stretch", sets: 3, rest: ISO }],
+    [{ n: "5", name: "Heel-elevated goblet squat", rx: "3 x 5-8", note: "RIR 2, 3 s down", sets: 3, rest: ISO }],
+    [{ n: "6a", name: "Landmine rotation", rx: "3 x 5-8/side", note: "Arms straight, turn from the trunk", sets: 3, rest: 0 },
+     { n: "6b", name: "Suitcase carry", rx: "3 x 20 m/side", note: "Stay tall, no lean", sets: 3, rest: CORE }]
+  ]},
+  wed: { day: "Wed", short: "Upper B", title: "Upper B", focus: "Chest + back", mins: "~65", run: "Lunch: easy 40-50 min", warm: UPPER_WARM, finisher: topups(false), groups: [
+    [{ n: "1", name: "Incline DB or machine press", rx: "3 x 5-8", note: "RIR 1-2", sets: 3, rest: BIG }],
+    [{ n: "2", name: "Lat pulldown", rx: "3 x 5-8", note: "RIR 1", sets: 3, rest: BIG }],
+    [{ n: "3", name: "Vertical chest press", rx: "3 x 5-8", note: "RIR 1", sets: 3, rest: BIG }],
+    [{ n: "4", name: "Chest-supported row", rx: "3 x 5-8", note: "Wide grip, elbows out. RIR 1", sets: 3, rest: BIG }],
+    [{ n: "5", name: "Pec deck", rx: "3 x 5-8", note: "Last set to failure", sets: 3, rest: ISO }],
+    [{ n: "6", name: "Cable lateral raise", rx: "3 x 8-12", note: "RIR 0-1", sets: 3, rest: ISO }],
+    [{ n: "7", name: "Cable face pulls", rx: "3 x 8-12", note: "RIR 1", sets: 3, rest: ISO }]
+  ]},
+  thu: { day: "Thu", short: "Lower B", title: "Lower B", focus: "Power + elastic", mins: "50-55", run: "No run", warm: LOWER_WARM, groups: [
+    [{ n: "1", name: "Single-leg pogo hops", rx: "3 x 10/leg", note: "1 x 15 double-leg first. Quick, stiff contacts", sets: 3, rest: PLY }],
+    [{ n: "2", name: "Box jumps, 50-60 cm", rx: "3 x 3", note: "Land soft, step down", sets: 3, rest: PLY }],
+    [{ n: "3", name: "Kettlebell swing", rx: "3 x 8-12", note: "24 kg to learn, 32 kg working", sets: 3, rest: ISO }],
+    [{ n: "4", name: "Step-up, knee-height box", rx: "3 x 5-8/leg", note: "Slow lowering. Add DBs once smooth", sets: 3, rest: ISO }],
+    [{ n: "5", name: "Single-leg RDL", rx: "3 x 5-8/leg", note: "Landmine or DB. Hips level", sets: 3, rest: ISO }],
+    [{ n: "6", name: "Copenhagen plank", rx: "3 x 20-30 s/side", note: "Adductors", sets: 3, rest: CORE }],
+    [{ n: "7", name: "Pallof press", rx: "3 x 8-12/side", note: "2 s hold, stay square", sets: 3, rest: CORE }],
+    [{ n: "8a", name: "Tibialis raise", rx: "3 x 8-12", note: "Slow lowering", sets: 3, rest: 0 },
+     { n: "8b", name: "Single-leg calf raise", rx: "3 x 8-12", note: "Full range", sets: 3, rest: CORE }]
+  ]},
+  fri: { day: "Fri", short: "Upper C", title: "Upper C", focus: "Delts + arms", mins: "45-50", run: "Lunch: easy + strides", droppable: true, warm: UPPER_WARM.slice(0, 6), finisher: topups(true), groups: [
+    [{ n: "1", name: "Single-arm cable lateral raise", rx: "3 x 8-12", note: "RIR 0-1", sets: 3, rest: ISO }],
+    [{ n: "2", name: "Seated DB lateral raise", rx: "3 x 8-12", note: "RIR 0-1", sets: 3, rest: ISO }],
+    [{ n: "3", name: "Cable rear delt fly", rx: "3 x 8-12", note: "RIR 1", sets: 3, rest: ISO }],
+    [{ n: "4a", name: "Cable drag curl", rx: "3 x 5-8", note: "RIR 1", sets: 3, rest: 0 },
+     { n: "4b", name: "V-bar pushdown", rx: "3 x 5-8", note: "RIR 1", sets: 3, rest: ISO }],
+    [{ n: "5a", name: "DB hammer curl", rx: "3 x 5-8", note: "Last set to failure", sets: 3, rest: 0 },
+     { n: "5b", name: "Overhead cable tricep extension", rx: "3 x 5-8", note: "Last set to failure", sets: 3, rest: ISO }],
+    [{ n: "6", name: "Hanging leg raise", rx: "3 x 5-8", note: "Slow, no swinging", sets: 3, rest: CORE }]
+  ]},
+  sun: { day: "Sun", short: "Mobility", title: "Mobility", kicker: "Sunday · Recovery", focus: "Hips, ankles, T-spine, hamstrings, calves, shoulders", mins: "45", minsLearn: "30-35", run: "No run", mobility: true, warm: null,
+    retest: [
+      ["Knee-to-wall distance", "Furthest toe-to-wall distance with the heel down and knee touching the wall. Each side."],
+      ["Active straight-leg raise", "On your back, raise one straight leg as high as you can. Film side-on and compare."],
+      ["Couch stretch position", "Can you get the torso upright while keeping the pelvis tucked?"],
+      ["When", "End of each deload week. If nothing moves after one block, adjust volume rather than dropping the day."]
+    ],
+    groups: [
+    { head: "Warm-up", sub: "5 min" },
+    [{ n: "1", name: "Bike or treadmill, easy", rx: "5 min", note: "Conversational pace or brisk incline walk", sets: 1, hold: 300, rest: TRANS, labels: ["Start"] }],
+    { head: "Foam roll", sub: "4 min" },
+    [{ n: "2", name: "Foam roll", rx: "1 min each area", note: "Tap an area to start its timer", sets: 4, hold: 60, rest: TRANS, labels: ["Calves", "Quads", "T-spine", "Lats"], how: HOW.roll }],
+    { head: "Active mobility", sub: "12 min" },
+    [{ n: "3", name: "Knee-to-wall ankle rocks", rx: "2 x 10/side", note: "Ankle dorsiflexion", sets: 2, rest: MOB, learn: { sets: 1, rx: "1 x 10/side" }, how: HOW.ankle }],
+    [{ n: "4", name: "90/90 hip switches", rx: "2 x 8/side", note: "Hip rotation", sets: 2, rest: MOB, learn: { sets: 1, rx: "1 x 8/side" }, how: HOW.hip9090 }],
+    [{ n: "5", name: "Cossack squat, KB counterweight", rx: "2 x 6/side", note: "Adductors, hips, ankles", sets: 2, rest: MOB, learn: { sets: 1, rx: "1 x 6/side" }, how: HOW.cossack }],
+    [{ n: "6", name: "Open books", rx: "2 x 8/side", note: "Thoracic rotation", sets: 2, rest: MOB, learn: { sets: 1, rx: "1 x 8/side" }, how: HOW.openbook }],
+    [{ n: "7", name: "Wall slides with lift-off", rx: "2 x 8", note: "Shoulder flexion, upper back", sets: 2, rest: MOB, learn: { sets: 1, rx: "1 x 8" }, how: HOW.wallslide }],
+    [{ n: "8", name: "Deep goblet squat hold", rx: "2 x 45 s", note: "Hips and ankles together", sets: 2, hold: 45, rest: MOB, learn: { sets: 1, hold: 30, rx: "1 x 30 s" }, how: HOW.goblet }],
+    { head: "Static holds", sub: "~20 min" },
+    [{ n: "9", name: "Couch stretch", rx: "2 x 60 s/side", note: "Hip flexors, quads", sets: 2, hold: 60, sides: 2, rest: TRANS, learn: { sets: 1, hold: 40, rx: "1 x 30-45 s/side" }, how: HOW.couch }],
+    [{ n: "10", name: "Elevated straight-leg hamstring stretch", rx: "2 x 60 s/side", note: "Hamstrings", sets: 2, hold: 60, sides: 2, rest: TRANS, learn: { sets: 1, hold: 40, rx: "1 x 30-45 s/side" }, how: HOW.hamstring }],
+    [{ n: "11", name: "Wall calf stretch, straight knee", rx: "1 x 60 s/side", note: "Upper calf", sets: 1, hold: 60, sides: 2, rest: TRANS, learn: { hold: 40, rx: "1 x 30-45 s/side" }, how: HOW.calfS }],
+    [{ n: "12", name: "Wall calf stretch, bent knee", rx: "1 x 60 s/side", note: "Lower calf", sets: 1, hold: 60, sides: 2, rest: TRANS, learn: { hold: 40, rx: "1 x 30-45 s/side" }, how: HOW.calfB }],
+    [{ n: "13", name: "Doorway or cable pec stretch", rx: "2 x 45 s/side", note: "Pecs, front of shoulder", sets: 2, hold: 45, sides: 2, rest: TRANS, learn: { sets: 1, hold: 40, rx: "1 x 30-45 s/side" }, how: HOW.pec }],
+    [{ n: "14", name: "Bench lat stretch", rx: "2 x 45 s", note: "Lats, overhead position", sets: 2, hold: 45, rest: 0, learn: { sets: 1, hold: 40, rx: "1 x 30-45 s" }, how: HOW.lat }]
+  ]},
+  run: { day: "Run", short: "Pre/post", title: "Run warm-up + cool-down", kicker: "Every run · No equipment", focus: "Warm-up before, cool-down after", mins: "7 + 5", run: "Anywhere: wall, kerb, grass", warm: null, groups: [
+    { head: "Warm-up · Activate", sub: "~2 min" },
+    [{ n: "1", name: "Single-leg glute bridge", rx: "1 x 10/leg", note: "Glutes", sets: 1, rest: 10, how: HOW.bridge }],
+    [{ n: "2", name: "Wall sit", rx: "2 x 30-45 s", note: "Quads, knee tendon", sets: 2, hold: 40, rest: 20, how: HOW.wallsit }],
+    [{ n: "3", name: "Hip hikes off a step or kerb", rx: "1 x 10/side", note: "Glute med, hip control", sets: 1, rest: 10, how: HOW.hiphike }],
+    { head: "Warm-up · Mobilise", sub: "~3 min" },
+    [{ n: "4", name: "Knee-to-wall ankle rocks", rx: "1 x 10/side", note: "Ankles. Wall, post or tree", sets: 1, rest: 0, how: HOW.ankle }],
+    [{ n: "5", name: "Leg swings, front-back", rx: "1 x 10/side", note: "Hamstrings, hip flexors", sets: 1, rest: 0, how: HOW.swingFB }],
+    [{ n: "6", name: "Leg swings, side-side", rx: "1 x 10/side", note: "Adductors, abductors", sets: 1, rest: 0, how: HOW.swingSS }],
+    [{ n: "7", name: "Reverse lunge + overhead reach", rx: "1 x 5/side", note: "Hip flexors, T-spine", sets: 1, rest: 0, how: HOW.lunge }],
+    { head: "Warm-up · Prime", sub: "~2 min", opt: true },
+    [{ n: "8", name: "Pogo hops", rx: "1 x 20", note: "Calves, Achilles", sets: 1, rest: 15, optional: true, how: HOW.pogo }],
+    [{ n: "9", name: "A-skips", rx: "2 x 20 m", note: "Walk back to recover", sets: 2, rest: 15, optional: true, how: HOW.askip }],
+    [{ n: "10", name: "High knees", rx: "2 x 20 m", note: "Walk back to recover", sets: 2, rest: 15, optional: true, how: HOW.highknees }],
+    { head: "Cool-down", sub: "~5 min" },
+    [{ n: "11", name: "Walk", rx: "2-3 min", note: "Easy, let the breathing settle", sets: 1, hold: 150, rest: 0, labels: ["Start"] }],
+    [{ n: "12", name: "Standing calf stretch", rx: "1 x 30 s/side", note: "Wall, tree or post", sets: 1, hold: 30, sides: 2, rest: 0, how: HOW.calfS }],
+    [{ n: "13", name: "Standing quad stretch", rx: "1 x 30 s/side", note: "Front of thigh", sets: 1, hold: 30, sides: 2, rest: 0, how: HOW.quad }],
+    [{ n: "14", name: "Half-kneeling hip flexor stretch", rx: "1 x 30 s/side", note: "Grass or folded jacket under the knee", sets: 1, hold: 30, sides: 2, rest: 0, how: HOW.hipflexor }]
+  ]}
+};
+Object.keys(SESSIONS).forEach(k => SESSIONS[k].id = k);
+const ORDER = ["mon", "tue", "wed", "thu", "fri", "sun", "run"];
+const DOWS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+// Storage: per-viewer convenience only. Progress is keyed to the calendar date, so it clears itself tomorrow.
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+};
+const pad = n => String(n).padStart(2, "0");
+const now = new Date();
+const dateKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+const todayId = DOWS[now.getDay()];
+const keyFor = id => `hv1:${dateKey}:${id}`;
+const mem = {};
+const getDone = id => mem[id] || (mem[id] = store.get(keyFor(id)) || {});
+const saveDone = id => store.set(keyFor(id), mem[id]);
+
+// Learning phase (Sunday weeks 1-2): swaps in each exercise's "learn" prescription.
+let learn = store.get("hv1:learn"); if (learn === null) learn = true;
+const mode = (e, s) => (s.mobility && learn && e.learn) ? { ...e, ...e.learn } : e;
+const flat = s => s.groups.filter(Array.isArray).flat().map(e => mode(e, s));
+const fin = s => s.finisher || [];
+const req = s => flat(s).filter(e => !e.optional);
+const totalSets = s => req(s).reduce((a, e) => a + e.sets, 0);
+const countIn = (list, done) => list.reduce((a, e) => { for (let i = 0; i < e.sets; i++) if (done[`${e.n}-${i}`]) a++; return a; }, 0);
+const doneCount = id => countIn(req(SESSIONS[id]), getDone(id));
+const openSet = new Set();
+
+let current = SESSIONS[todayId] ? todayId : "mon";
+try { const h = location.hash.replace("#", ""); if (SESSIONS[h]) current = h; } catch (e) {}
+
+// Header date
+const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+document.getElementById("today").innerHTML =
+  `<b>${dayNames[now.getDay()]}</b>${now.getDay() === 6 ? "Long run day" : now.getDay() === 0 ? "Mobility day" : "Gym morning"}`;
+
+const check = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const play = '<svg class="pl" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l7 4-7 4z" fill="currentColor"/></svg>';
+const ext = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2H10v5.5M10 2L3 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+
+function renderDays() {
+  const el = document.getElementById("days");
+  el.innerHTML = ORDER.map(id => {
+    const s = SESSIONS[id];
+    const complete = doneCount(id) >= totalSets(s);
+    return `<button class="day${id === todayId ? " is-today" : ""}" role="tab" aria-selected="${id === current}" data-id="${id}">
+      ${complete ? '<span class="pip" aria-label="complete"></span>' : ""}
+      <span class="d">${s.day}</span><span class="s">${s.short}</span></button>`;
+  }).join("") + etaHTML();
+}
+
+// ETA: model each remaining set as work time + its rest, then rescale by your actual pace once 3+ sets are ticked.
+const workFor = e => e.hold ? e.hold * (e.sides || 1) + (e.sides > 1 ? SWITCH : 0)
+  : (e.rest === BIG ? 50 : e.rest === PLY ? 25 : 40) * (/\/(leg|side)/.test(e.rx) ? 2 : 1);
+const getT = id => store.get(keyFor(id) + ":t") || {};
+const stamp = id => { const t = getT(id), ts = Date.now(); if (!t.start) t.start = ts; t.last = ts; store.set(keyFor(id) + ":t", t); };
+function modelSecs(s, done, wantDone) {
+  const all = [];
+  req(s).forEach(e => { for (let i = 0; i < e.sets; i++) all.push({ e, k: `${e.n}-${i}` }); });
+  let secs = 0;
+  all.forEach((x, idx) => {
+    if (!!done[x.k] !== wantDone) return;
+    const last = idx === all.length - 1;
+    secs += workFor(x.e) + (last ? 0 : (x.e.rest || 10));
+  });
+  return secs;
+}
+const clock = d => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).toLowerCase().replace(/\s/g, " ");
+function etaHTML() {
+  const s = SESSIONS[current], done = getDone(current), t = getT(current);
+  const count = doneCount(current), total = totalSets(s);
+  if (count >= total) {
+    const mins = t.start && t.last ? Math.round((t.last - t.start) / 60000) : null;
+    return `<div class="eta fin"><div><div class="el">Session time</div><div class="ev">${mins != null ? mins + "<small>MIN</small>" : "Done"}</div></div><div class="er"><div class="el">Finished</div><div class="ev">${t.last ? clock(new Date(t.last)) : "Done"}</div></div></div>`;
+  }
+  let rem = modelSecs(s, done, false);
+  if (count === 0 && s.warm) rem += 8 * 60;
+  let mode = "Estimate";
+  if (count >= 3 && t.start && t.last) {
+    const modelDone = modelSecs(s, done, true);
+    const actual = (t.last - t.start) / 1000;
+    if (modelDone > 0) { rem *= Math.min(1.6, Math.max(0.6, actual / modelDone)); mode = "Your pace"; }
+  }
+  const finish = new Date(Date.now() + rem * 1000);
+  const left = Math.max(1, Math.round(rem / 60));
+  return `<div class="eta"><div><div class="el">${count ? "Time left" : "Start now"} · ${mode}</div><div class="ev">${left}<small>MIN</small></div></div><div class="er"><div class="el">${count ? "ETA finish" : "Finish by"}</div><div class="ev">${clock(finish)}</div></div></div>`;
+}
+setInterval(() => { try { renderDays(); } catch (e) {} }, 30000);
+
+function howHTML(e) {
+  if (!e.how) return "";
+  const h = e.how, oid = `how-${current}-${e.n}`;
+  const q = encodeURIComponent(h.q || e.name);
+  return `<details class="how" data-oid="${oid}"${openSet.has(oid) ? " open" : ""}><summary>How to <span class="chev">&#9662;</span></summary>
+    <div class="howb"><dl>
+      <dt>Setup</dt><dd>${h.s}</dd>
+      <dt>Cues</dt><dd><ul>${h.c.map(x => `<li>${x}</li>`).join("")}</ul></dd>
+      <dt>Should feel</dt><dd>${h.f}</dd>
+      <dt>Avoid</dt><dd>${h.a}</dd>
+      <dt>Easier</dt><dd>${h.e}</dd>
+    </dl><a class="demo" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">Watch demo ${ext}</a></div></details>`;
+}
+
+function exHTML(e, done) {
+  const k = e.n;
+  let dots = "", allDone = true;
+  for (let i = 0; i < e.sets; i++) {
+    const key = `${k}-${i}`, on = !!done[key];
+    const live = !on && hold && hold.sid === current && hold.key === key;
+    if (!on) allDone = false;
+    const lbl = e.labels ? e.labels[i] : "Set " + (i + 1);
+    const inner = on ? check + (e.labels ? lbl : "") : live ? "Hold" : (e.hold ? play : "") + lbl;
+    dots += `<button class="dot${live ? " live" : ""}" aria-pressed="${on}" data-k="${k}" data-i="${i}" aria-label="${e.name} ${lbl}${e.hold ? ", start hold timer" : ""}">${inner}</button>`;
+  }
+  return `<article class="ex${allDone ? " complete" : ""}">
+    <div class="num">${k}</div>
+    <div><h3>${e.name}</h3><div class="rx"><span class="sets">${e.rx}</span><span class="note">${e.note}</span></div></div>
+    <div class="dots">${dots}</div>${howHTML(e)}</article>`;
+}
+
+function render() {
+  const s = SESSIONS[current];
+  const done = getDone(current);
+  const total = totalSets(s), count = doneCount(current);
+  const C = 2 * Math.PI * 30, off = C * (1 - Math.min(count / total, 1));
+  const satPreview = now.getDay() === 6 && current === "mon" && !location.hash;
+
+  let html = "";
+  if (satPreview) {
+    html += `<div class="empty"><b>Long run today</b>No gym session. Monday's session is below so you can preview it.</div>`;
+  }
+  html += `<section class="hero">
+    <div>
+      <div class="kicker">${s.kicker || (s.day + " morning")}</div>
+      <h2>${s.title}</h2>
+      <div class="meta"><span>${s.focus}</span><span>~${s.mobility && learn ? s.minsLearn : s.mins} min</span><span>${s.run}</span>${s.droppable ? '<span class="tag">Droppable</span>' : ""}${s.mobility && learn ? '<span class="tag">Learning</span>' : ""}</div>
+    </div>
+    <div class="ring" role="img" aria-label="${count} of ${total} sets done">
+      <svg viewBox="0 0 74 74"><circle class="track" cx="37" cy="37" r="30"/><circle class="bar" cx="37" cy="37" r="30" stroke-dasharray="${C}" stroke-dashoffset="${off}"/></svg>
+      <div class="lbl"><div>${count}/${total}<small>SETS</small></div></div>
+    </div>
+  </section>`;
+
+  if (s.mobility) {
+    html += `<div class="modebar"><div class="seg" role="group" aria-label="Session mode">
+      <button data-mode="learn" aria-pressed="${learn}">Learning · Wk 1-2</button><button data-mode="full" aria-pressed="${!learn}">Full session</button></div>
+      <p>${learn ? "1 set each, shorter holds. Open How to before each drill, and film 2-3 drills side-on to check against the cues." : "Full prescription. Move to firm tension, not pain, and ease deeper on each breath out."}</p></div>`;
+  }
+
+  if (s.warm) {
+    const oid = `warm-${current}`;
+    html += `<details class="warm" data-oid="${oid}"${openSet.has(oid) ? " open" : ""}><summary>Warm-up · 8 min <span class="chev">&#9662;</span></summary><ul>
+      ${s.warm.map(w => `<li><span>${w[0]}</span><span>${w[1]}</span></li>`).join("")}</ul></details>`;
+  }
+
+  html += `<div class="list">`;
+  s.groups.forEach(g => {
+    if (!Array.isArray(g)) { html += `<div class="sec"><span>${g.head}${g.opt ? ' <span class="tag">Optional</span>' : ""}</span><span>${g.sub}</span></div>`; return; }
+    const ss = g.length > 1;
+    html += `<div class="group${ss ? " ss" : ""}">${ss ? '<div class="glabel">Superset · alternate, rest after both</div>' : ""}`;
+    g.forEach(e => { html += exHTML(mode(e, s), done); });
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  const f = fin(s), fc = countIn(f, done), ft = f.reduce((a, e) => a + e.sets, 0);
+  if (f.length) {
+    const oid = `top-${current}`;
+    html += `<details class="topup${fc >= ft ? " fin" : ""}" data-oid="${oid}"${openSet.has(oid) ? " open" : ""}><summary>
+      <div><div class="fk">Finisher · after last set</div><div class="ft">Mobility top-up</div></div>
+      <div class="tr"><span>~6 min</span><span class="tc">${fc}/${ft}</span><span class="chev">&#9662;</span></div></summary>
+      <div class="tbody">${f.map(e => exHTML(e, done)).join("")}</div></details>`;
+  }
+
+  if (s.retest) {
+    const oid = `re-${current}`;
+    html += `<details class="warm re" data-oid="${oid}"${openSet.has(oid) ? " open" : ""}><summary>Retest · every 4 weeks <span class="chev">&#9662;</span></summary><ul>
+      ${s.retest.map(r => `<li><b>${r[0]}</b><span>${r[1]}</span></li>`).join("")}</ul></details>`;
+  }
+
+  if (count >= total) html += `<div class="finish">${f.length && fc < ft ? "Session done. Open the finisher for your top-up." : "Session done. Nice work."}</div>`;
+  html += `<div class="foot"><span>Ticks clear automatically tomorrow.</span><button class="reset" id="reset">Reset</button></div>`;
+
+  document.getElementById("main").innerHTML = html;
+  renderDays();
+}
+function rerender() { const y = window.scrollY; render(); window.scrollTo(0, y); }
+
+// Timer dock: rest countdowns, and hold countdowns with a side-switch cue.
+const tEl = document.getElementById("timer"), tTime = document.getElementById("tTime"),
+      tLabel = document.getElementById("tLabel"), tNext = document.getElementById("tNext"), tFill = document.getElementById("tFill"),
+      tSkip = document.getElementById("tSkip");
+let tEnd = 0, tLen = 0, tInt = null, hideT = null, wake = null, hold = null, tMode = "rest";
+const fmt = s => `${Math.floor(s / 60)}:${pad(Math.max(0, s % 60))}`;
+const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+
+async function keepAwake() {
+  try { if ("wakeLock" in navigator && !wake) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => wake = null); } } catch (e) {}
+}
+function setTimer(sec, label, next, cls) {
+  clearTimeout(hideT);
+  tLen = sec; tEnd = Date.now() + sec * 1000;
+  tEl.classList.remove("done", "hold", "switch"); if (cls) tEl.classList.add(cls); tEl.classList.add("show");
+  tLabel.textContent = label; tNext.textContent = next || "";
+  clearInterval(tInt); tick(); tInt = setInterval(tick, 250);
+  keepAwake();
+}
+function startTimer(sec, next) {
+  hold = null; tMode = "rest"; tSkip.textContent = "Skip";
+  setTimer(sec, "Rest", next ? "Next: " + next : "");
+}
+function runHoldPhase() {
+  const h = hold, lbl = h.e.labels ? h.e.labels[h.idx] : `Set ${h.idx + 1}`;
+  const side = h.sides > 1 ? (h.side === 0 ? " · Left side" : " · Right side") : "";
+  tSkip.textContent = h.side < h.sides - 1 ? "Next" : "Done";
+  setTimer(h.e.hold, "Hold" + side, `${h.e.name} · ${lbl}`, "hold");
+}
+function startHold(sid, key, e, idx) {
+  hold = { sid, key, e, idx, side: 0, sides: e.sides || 1, phase: "hold" };
+  tMode = "hold";
+  runHoldPhase();
+  rerender();
+}
+function tick() {
+  const left = Math.ceil((tEnd - Date.now()) / 1000);
+  tTime.textContent = fmt(Math.max(left, 0));
+  tFill.style.transform = `scaleX(${Math.max(0, (tEnd - Date.now()) / (tLen * 1000))})`;
+  if (left <= 0) onTimerEnd();
+}
+function onTimerEnd() {
+  if (tMode === "hold" && hold) {
+    if (hold.phase === "hold" && hold.side < hold.sides - 1) {
+      hold.phase = "switch"; buzz([120]); tSkip.textContent = "Go";
+      setTimer(SWITCH, "Switch sides", "Right side next", "switch"); return;
+    }
+    if (hold.phase === "switch") { hold.side++; hold.phase = "hold"; buzz([120]); runHoldPhase(); return; }
+    completeHold(); return;
+  }
+  finishRest();
+}
+function completeHold() {
+  const h = hold; hold = null; tMode = "rest"; tSkip.textContent = "Skip";
+  const s = SESSIONS[h.sid], done = getDone(h.sid);
+  done[h.key] = true; saveDone(h.sid); stamp(h.sid);
+  buzz([180, 80, 180]);
+  const list = fin(s).includes(h.e) ? fin(s) : flat(s);
+  const next = nextUp(list, done);
+  rerender();
+  if (next && h.e.rest > 0) { startTimer(h.e.rest, next); return; }
+  clearInterval(tInt);
+  tEl.classList.remove("hold", "switch"); tEl.classList.add("done", "show");
+  tLabel.textContent = "Hold done"; tTime.textContent = "DONE"; tNext.textContent = next ? "Next: " + next : "";
+  hideT = setTimeout(hideTimer, 4000);
+}
+function finishRest() {
+  clearInterval(tInt);
+  tEl.classList.add("done"); tLabel.textContent = "Rest done"; tTime.textContent = "GO";
+  buzz([180, 80, 180]);
+  hideT = setTimeout(hideTimer, 5000);
+}
+function hideTimer() { clearInterval(tInt); tEl.classList.remove("show"); }
+function cancelHold() { hold = null; tMode = "rest"; tSkip.textContent = "Skip"; hideTimer(); }
+document.getElementById("tPlus").onclick = () => {
+  if (tMode === "rest" && tEl.classList.contains("done")) { if (tLabel.textContent === "Rest done") startTimer(15, tNext.textContent.replace("Next: ", "")); return; }
+  tEnd += 15000; tLen += 15; tick();
+};
+document.getElementById("tMinus").onclick = () => { if (tEl.classList.contains("done")) return; tEnd -= 15000; tick(); };
+tSkip.onclick = () => { if (tMode === "hold" && hold) onTimerEnd(); else hideTimer(); };
+
+function nextUp(list, done) {
+  for (const e of list) for (let i = 0; i < e.sets; i++) if (!done[`${e.n}-${i}`]) return `${e.name}, ${e.labels ? e.labels[i] : "set " + (i + 1)}`;
+  return "";
+}
+
+// Events
+document.getElementById("days").addEventListener("click", ev => {
+  const b = ev.target.closest(".day"); if (!b) return;
+  current = b.dataset.id;
+  try { history.replaceState(null, "", "#" + current); } catch (e) {}
+  render(); window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+const main = document.getElementById("main");
+main.addEventListener("toggle", ev => {
+  const d = ev.target; if (!d.dataset || !d.dataset.oid) return;
+  if (d.open) openSet.add(d.dataset.oid); else openSet.delete(d.dataset.oid);
+}, true);
+
+let armT = null;
+main.addEventListener("click", ev => {
+  const m = ev.target.closest("[data-mode]");
+  if (m) {
+    const want = m.dataset.mode === "learn";
+    if (want !== learn) { learn = want; store.set("hv1:learn", learn); if (hold && hold.sid === current) cancelHold(); rerender(); }
+    return;
+  }
+  const d = ev.target.closest(".dot");
+  if (d) {
+    const s = SESSIONS[current], done = getDone(current);
+    const key = `${d.dataset.k}-${d.dataset.i}`;
+    const inFin = fin(s).some(x => x.n === d.dataset.k);
+    const list = inFin ? fin(s) : flat(s);
+    const e = list.find(x => x.n === d.dataset.k);
+    if (e.hold) {
+      if (done[key]) { done[key] = false; saveDone(current); rerender(); return; }
+      if (hold && hold.sid === current && hold.key === key) { cancelHold(); rerender(); return; }
+      startHold(current, key, e, +d.dataset.i);
+      return;
+    }
+    done[key] = !done[key];
+    saveDone(current);
+    if (done[key]) {
+      stamp(current);
+      const next = nextUp(list, done);
+      if (!next) { hideTimer(); }
+      else if (e.rest > 0) startTimer(e.rest, next);
+      else { tEl.classList.remove("show"); }
+    }
+    rerender();
+    return;
+  }
+  const r = ev.target.closest("#reset");
+  if (r) {
+    if (r.classList.contains("arm")) {
+      mem[current] = {}; store.del(keyFor(current)); store.del(keyFor(current) + ":t");
+      if (hold && hold.sid === current) cancelHold(); else hideTimer();
+      render();
+    } else {
+      r.classList.add("arm"); r.textContent = "Tap to confirm";
+      clearTimeout(armT); armT = setTimeout(() => { r.classList.remove("arm"); r.textContent = "Reset"; }, 3000);
+    }
+  }
+});
+
+render();
+
+// Offline: register the service worker so the app loads with no signal once visited.
+if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); }); }
+</script>
+
+</body></html>
