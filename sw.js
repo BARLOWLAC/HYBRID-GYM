@@ -1,7 +1,7 @@
 // Offline support for the Hybrid Gym web app.
 // Page: network first, so a new version shows up as soon as you have signal; cached copy when offline.
 // Everything else (icons, fonts): served from cache, refreshed in the background.
-const CACHE = "hybrid-gym-v2";
+const CACHE = "hybrid-gym-v3";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", event => {

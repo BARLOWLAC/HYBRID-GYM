@@ -515,7 +515,7 @@ const countIn = (list, done) => list.reduce((a, e) => { for (let i = 0; i < e.se
 const doneCount = id => countIn(req(SESSIONS[id]), getDone(id));
 const openSet = new Set();
 
-let current = SESSIONS[todayId] ? todayId : "mon";
+let current = SESSIONS[todayId] ? todayId : (todayId === "sat" ? "run" : "mon"); // Saturday = long run, so open Run pre/post
 try { const h = location.hash.replace("#", ""); if (SESSIONS[h]) current = h; } catch (e) {}
 
 // Header date
@@ -822,6 +822,16 @@ main.addEventListener("click", ev => {
 });
 
 render();
+
+// New day: an iPhone home-screen app is often frozen in the background, not closed. When it comes back
+// on a different date, reload so it opens on today's session with fresh ticks.
+function freshDay() {
+  const d = new Date(), k = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  if (k !== dateKey) location.replace(location.pathname);
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") freshDay(); });
+window.addEventListener("pageshow", freshDay);
+window.addEventListener("focus", freshDay);
 
 // Offline: register the service worker so the app loads with no signal once visited.
 if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); }); }
